@@ -7,6 +7,8 @@ import (
 	"os"
 	"strings"
 	"sync"
+
+	"github.com/spf13/viper"
 )
 
 // process a unit of work for each file
@@ -36,6 +38,50 @@ func NewFileProcessor(files []string, word string, workerCount int) *FileProcess
 		Word:        word,
 		WorkerCount: workerCount,
 	}
+}
+
+// Load configuration in config.yaml file
+func LoadConfig() (*FileProcessor, error) {
+	//  set up viper to read from the config.yaml file and environment variables
+	viper.SetConfigName("config")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath(".")
+
+	// environment variable support with prefixes
+	viper.AutomaticEnv()
+
+	viper.SetEnvPrefix("app") // env variable prefix
+	viper.BindEnv("files")    // binds APP_FILES to override the file path
+	viper.BindEnv("word")     // binds APP_WORD to override search word
+	viper.BindEnv("workerCount")
+
+	// read in config file
+	if err := viper.ReadInConfig(); err != nil {
+		fmt.Printf("Error reading in config file:  %s\n", err)
+	}
+
+	// set defaut values if not provided in config file or environment variable
+	viper.SetDefault("files", []string{"./sample1.txt"})
+	viper.SetDefault("word", "go")
+	viper.SetDefault("workerCount", 1)
+
+	// extract configuration values
+	files := viper.GetStringSlice("files")
+	word := viper.GetString("word")
+	workerCount := viper.GetInt("workerCount")
+
+	// handle the comma-separated list from env variable
+	if envfiles := viper.GetString("files"); envfiles != "" {
+		files = strings.Split(envfiles, ",")
+	}
+
+	fmt.Println("env files := ", files)
+	fmt.Println("word := ", word)
+	fmt.Println("worker := ", workerCount)
+
+	// Iniatialize FileProcessor with the loaded config
+	fp := NewFileProcessor(files, word, workerCount)
+	return fp, nil
 }
 
 // initializes file processing
@@ -116,13 +162,20 @@ func (fp *FileProcessor) CountWord(ctx context.Context, job Job) Result {
 }
 
 func main() {
-	filePaths := []string{
-		"./file1.txt",
-		"./file2.txt",
-		"./file3.txt",
-	}
+	// filePaths := []string{
+	// 	"./file1.txt",
+	// 	"./file2.txt",
+	// 	"./file3.txt",
+	// }
 
-	fp := NewFileProcessor(filePaths, "from", 3)
+	// fp := NewFileProcessor(filePaths, "from", 3)
+	//load enviroment variable and initialize FileProcessor
+	fp, err := LoadConfig()
+
+	if err != nil {
+		fmt.Printf("Error processing configuration : %v", err)
+		return
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 
