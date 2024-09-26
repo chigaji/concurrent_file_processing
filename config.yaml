@@ -1,0 +1,6 @@
+files:
+  - "./file1.txt"
+  - "./file2.txt"
+  - "./file3.txt"
+word : "the"
+workerCount: 5
